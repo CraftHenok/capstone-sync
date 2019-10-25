@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd">
+	
+	<flow name="readintegrationFlow" doc:id="6d81a31d-13bc-45da-a767-ab623debb099" >
+		<http:listener doc:name="Listener" doc:id="544b4caf-cb0d-4fdb-9516-6a422f5f60ec" config-ref="HTTP_Listener_config" path="/getaccounts"/>
+		<flow-ref doc:name="Query Account" doc:id="1fd91562-4dca-47a1-99c2-077016acb296" name="query_implementationFlow"/>
+		<logger level="INFO" doc:name="Logger" doc:id="4b754311-a13c-4200-8e06-02b50feebbaa" message="#[payload]"/>
+	</flow>
+	<flow name="syncFlow" doc:id="0a5e9fbf-b20c-4425-943e-5146de6817fd" >
+		<http:listener doc:name="Listener" doc:id="1961f30a-6a73-46a0-b59b-06aa74233b21" config-ref="HTTP_Listener_config" path="/syncaccount"/>
+		<salesforce:query doc:name="Query" doc:id="40dd9c45-c3f0-46fd-ac16-4ec5af85bfd6" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >SELECT AccountNumber,Name FROM Account</salesforce:salesforce-query>
+		</salesforce:query>
+		<foreach doc:name="For Each" doc:id="f3b68f68-bda0-4c27-b187-0e0359c6b253" >
+			<set-payload value="#[payload.Name]" doc:name="Set Payload" doc:id="7b8cbf65-7d30-43e8-a88e-1aa4d7b04393" />
+			<db:insert doc:name="Insert" doc:id="eea30f98-81d9-4209-85de-19777f779b89" config-ref="Database_Config">
+				<db:sql >INSERT INTO `salesforceintegration`.`accountsync` (`name`) VALUES (:Name);</db:sql>
+				<db:input-parameters ><![CDATA[#[{Name:payload}]]]></db:input-parameters>
+			</db:insert>
+			<logger level="INFO" doc:name="Logger" doc:id="e7faf752-9327-4d36-835c-403addc86cc0" message="Insert Success"/>
+		</foreach>
+		<ee:transform doc:name="Transform Message" doc:id="199b2919-062a-4dfc-9352-5442c4ef3be0" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="3a723b1a-51e5-458a-a8ce-ffa44fdaae5b" message="Sync Finished"/>
+	</flow>
+</mule>
